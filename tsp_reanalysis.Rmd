@@ -1,0 +1,80 @@
+---
+title: Pre-Analysis Plan for Anchoring and TSP Study
+author: Paul Testa
+date: \today
+---
+
+
+
+```{r opts,echo=FALSE,message=F,warning=F}
+library(knitr)
+# Set global display options
+# Probably would change to produce report
+opts_chunk$set(eval=T,echo=T,message=F,warning=F,cache=T
+               )
+
+```
+
+
+# Load data
+
+```{r}
+library(foreign)
+library(readstata13)
+tsp<-read.dta13("~/Documents/sbst/tsp/all_indiv.dta")
+```
+
+# Inspect and Clean Data
+
+```{r}
+dim(tsp) # 699647 observations
+
+table(tsp$Group)
+class(tsp$Group)
+# recode treatment as factor:
+library(car)
+tsp$treatment<-recode(tsp$Group, "0='Control';
+                      9='No Suggestion'
+                      ")
+# Re-Order factor
+tsp$treatment<-factor(tsp$treatment,levels=c("Control","No Suggestion",1:8))
+table(tsp$treatment)
+
+# Treatment indicator: suggestion or not
+tsp$treat_suggest<-recode(tsp$treatment,"1:8='Suggestion'")
+table(tsp$participate,tsp$treat_suggest)
+
+# Outcome
+
+
+
+```
+
+
+# Analysis
+
+## Total Participation by Treatment
+
+```{r}
+table(tsp$participate,tsp$treat_suggest)
+table(tsp$participate,tsp$treatment)
+
+```
+
+## Percent Participating by Treatment
+
+```{r}
+apply(table(tsp$participate,tsp$treat_suggest),2,prop.table)*100
+apply(table(tsp$participate,tsp$treatment),2,prop.table)*100
+
+```
+
+## Linear Model
+
+```{r}
+lm(participate~treatment,tsp)
+```
+
+
+
+
