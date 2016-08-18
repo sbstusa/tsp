@@ -1,80 +1,245 @@
 ---
-title: Pre-Analysis Plan for Anchoring and TSP Study
-author: Paul Testa
-date: \today
+title: "SBST Abstract: Anchoring & TSP Enrollment: *Suggesting contribution rates promotes savings enrollment and contributions*"
+author: "Paul Testa and Jake Bowers"
+date: '`r format(Sys.Date(), "%B %d, %Y")`'
+output:
+html_document:
+toc: TRUE
 ---
 
 
-
-```{r opts,echo=FALSE,message=F,warning=F}
-library(knitr)
-# Set global display options
-# Probably would change to produce report
-opts_chunk$set(eval=T,echo=T,message=F,warning=F,cache=T
-               )
+```{r init,echo=F}
+## Easy way to look for and install missing packages and load them
+if (!require("pacman")){ install.packages("pacman") }
+pacman::p_load("knitr","mosaic","plyr","coin","ggplot2","readstata13","car","lmtest","sandwich","gtable","grid")
+## library(knitr)
+opts_chunk$set(eval=T,echo=T,message=F,warning=F,cache=T)
+options(digits=5,width=100,scipen=8)
 
 ```
 
 
+# Agency Objective. 
+
+Increase enrollment and contribution rates in Thrift Savings Plans among interested active duty Servicemembers using behaviorally designed email communications.
+
+# Background
+
+The Federal government operates a workplace savings program called the Thrift Savings Plan (TSP) for all of its employees.^[For general background information on TSP, see: tsp.gov] While the Government automatically enrolls its civilian employees in TSP, it does not automatically enroll Servicemembers, and military enrollment rates average roughly 42 percent.^[Enrollment rates for TSP as of late 2014 are reported here: frtib.gov/pdf/minutes/MM-2014Dec-Att1.pdf
+The differing enrollment procedures are described at: tsp.gov/planparticipation/eligibility/establishingAccount.shtml
+] In order to enroll, Servicemembers need to log in to a website and select from a suite of potential contribution percentages. A 2015 Department of Defense (DOD) and Social and Behavioral Sciences Team (SBST) study showed that many of the nearly 800,000 unenrolled Servicemembers chose to enroll in TSP when actively emailed about a chance to do so. 
+
+
+# Design
+
+The Defense Finance and Accounting Service (DFAS), in collaboration with the Social and Behavioral Sciences Team (SBST) and academic researchers, tested the impact on TSP enrollment of sending unenrolled Servicemembers emails that suggested contribution rates.^[Katherine L. Milkman collaborated with SBST on this project.
+] In addition to a no-email control and a message based on a 2015 test’s, eight different messages added a prompt that many Servicemembers start contributing at a suggested rate of between 1 and 8%.^[ See anchoring literature.] The 699,674 Servicemembers who were not enrolled in TSP as of January 26, 2016 were randomly assigned to these ten groups. After DFAS sent out the emails on January 27, 2016, it tracked TSP enrollment by SSN through the end of February.
+
+
+```{r}
 # Load data
-
-```{r}
-library(foreign)
-library(readstata13)
 tsp<-read.dta13("~/Documents/sbst/tsp/all_indiv.dta")
-```
-
-# Inspect and Clean Data
-
-```{r}
-dim(tsp) # 699647 observations
-
-table(tsp$Group)
-class(tsp$Group)
-# recode treatment as factor:
-library(car)
+# Recode treatment
 tsp$treatment<-recode(tsp$Group, "0='Control';
                       9='No Suggestion'
                       ")
-# Re-Order factor
+# Re-order levels of factor
 tsp$treatment<-factor(tsp$treatment,levels=c("Control","No Suggestion",1:8))
-table(tsp$treatment)
 
-# Treatment indicator: suggestion or not
-tsp$treat_suggest<-recode(tsp$treatment,"1:8='Suggestion'")
-table(tsp$participate,tsp$treat_suggest)
-
-# Outcome
-
+# Additional treatment indicators
+# Suggestion or not
+tsp$treat_type<-recode(tsp$treatment,"1:8='Suggestion'")
+# Email type
+tsp$treat_email<-ifelse(tsp$treatment=="Control","Control","Email")
 
 
 ```
 
 
-# Analysis
+# Results
 
-## Total Participation by Treatment
+One month after the emails were sent, 18,451 Servicemembers had enrolled: 1,362 in the no-email group (1.94%), compared with 1,813 who received an email with no suggested contribution rate (2.58%) and 15,276 across those sent the eight anchoring emails (2.73%). 
 
 ```{r}
-table(tsp$participate,tsp$treat_suggest)
-table(tsp$participate,tsp$treatment)
+# Number enrolled
+table(tsp$participate)
+
+# Enrollment by Treatment Type
+table(tsp$participate,tsp$treat_type)
+
+# Use linear models to obtain proportions
+
+m1<-lm(participate~treat_type,tsp)
+props_type<-c(coef(m1)[1],coef(m1)[1]+coef(m1)[2:3])
+props_type
+# Test difference of proptions
+coeftest(m1,vcov=vcovHC(m1,type="HC2") )
+# Test equality of No Suggested Rate vs Suggested Contribution Rate
+linearHypothesis(m1,"treat_typeNo Suggestion=treat_typeSuggestion",vcov=vcovHC(m1,type="HC2") )
 
 ```
 
-## Percent Participating by Treatment
+
+Emails with suggested contribution anchors ranged from a low of 2.49% (for a 7 percent suggestion) to a high of 2.97% (for a 1 percent suggestion). 
 
 ```{r}
-apply(table(tsp$participate,tsp$treat_suggest),2,prop.table)*100
-apply(table(tsp$participate,tsp$treatment),2,prop.table)*100
+# Use linear models to obtain proportions by suggested contribution rate
+
+m2<-lm(participate~treatment,tsp)
+props_sc<-c(coef(m2)[1],coef(m2)[1]+coef(m2)[2:10])
+props_sc
+range(props_sc[2:10])
+
+coeftest(m2,vcov=vcovHC(m2,type="HC2") )
 
 ```
 
-## Linear Model
+
+
+This means that 40 percent more Servicemembers enrolled in TSP in February 2016 as a result of being sent any email message. 
 
 ```{r}
-lm(participate~treatment,tsp)
+# Effect of receiving any email
+m3<-lm(participate~treat_email,tsp)
+props_email<-c(coef(m3)[1],coef(m3)[1]+coef(m3)[2])
+props_email
+(1-props_email[2]/props_email[1])*100
+coeftest(m3,vcov=vcovHC(m3,type="HC2") )
+
 ```
 
 
+Suggesting low contribution rates (1% and 2%) led to slightly higher new enrollments, but those suggestions also led to lower average contribution rates among those that contributed. From 3% up to 8%, increasing the suggested contribution rate did not depress savings.
+
+```{r}
+# Compare contributions rates to just baseline email
+m4<-lm(participate~treatment,tsp[tsp$treatment!="Control",])
+coeftest(m4,vcov=vcovHC(m4,type="HC2") )
+```
+
+
+
+
+For each of the eight suggested contribution rates, there was some evidence suggestive of an anchoring effect – Servicemembers were more likely to contribute at exactly the suggested rate than those who were not given a suggested rate.
+
+```{r}
+# Anchoring
+table(tsp$totalcont)
+# Create indicator of contribution at suggested rate
+tsp$contrib_at_suggest<-tsp$totalcont==tsp$treatment
+# Indicator of Individual rates
+tsp$contrib_1<-as.numeric(tsp$totalcont==1)
+tsp$contrib_2<-as.numeric(tsp$totalcont==2)
+tsp$contrib_3<-as.numeric(tsp$totalcont==3)
+tsp$contrib_4<-as.numeric(tsp$totalcont==4)
+tsp$contrib_5<-as.numeric(tsp$totalcont==5)
+tsp$contrib_6<-as.numeric(tsp$totalcont==6)
+tsp$contrib_7<-as.numeric(tsp$totalcont==7)
+tsp$contrib_8<-as.numeric(tsp$totalcont==8)
+
+# Suggested Rate: 1
+m_c_1<-lm(contrib_1~treatment,tsp[tsp$treatment!="Control",])
+coeftest(m_c_1,vcovHC(m_c_1,type="HC2"))
+
+# Suggested Rate: 2
+m_c_2<-lm(contrib_2~treatment,tsp[tsp$treatment!="Control",])
+coeftest(m_c_2,vcovHC(m_c_2,type="HC2"))
+
+# Suggested Rate: 3
+m_c_3<-lm(contrib_3~treatment,tsp[tsp$treatment!="Control",])
+coeftest(m_c_3,vcovHC(m_c_3,type="HC2"))
+
+# Suggested Rate: 4
+m_c_4<-lm(contrib_4~treatment,tsp[tsp$treatment!="Control",])
+coeftest(m_c_4,vcovHC(m_c_4,type="HC2"))
+
+# Suggested Rate: 5
+m_c_5<-lm(contrib_5~treatment,tsp[tsp$treatment!="Control",])
+coeftest(m_c_5,vcovHC(m_c_5,type="HC2"))
+
+# Suggested Rate: 6
+m_c_6<-lm(contrib_6~treatment,tsp[tsp$treatment!="Control",])
+coeftest(m_c_6,vcovHC(m_c_6,type="HC2"))
+
+# Suggested Rate: 7
+m_c_7<-lm(contrib_7~treatment,tsp[tsp$treatment!="Control",])
+coeftest(m_c_7,vcovHC(m_c_7,type="HC2"))
+
+# Suggested Rate: 8
+m_c_8<-lm(contrib_8~treatment,tsp[tsp$treatment!="Control",])
+coeftest(m_c_8,vcovHC(m_c_8,type="HC2"))
+
+
+```
+
+
+```{r}
+# Reproduce Figure
+
+# Calculate Proportions Participating
+partic<-table(tsp$treatment)
+
+partic_rate<-apply(table(tsp$participate,tsp$treatment),2,prop.table)[2,]
+partic_df<-data.frame(treatment=names(partic_rate),rate=partic_rate,n=t(partic)[1,])
+partic_df$se<-with(partic_df,sqrt(rate*(1-rate)/n))
+partic_df$ll<-with(partic_df,rate-1.96*se)
+partic_df$ul<-with(partic_df,rate+1.96*se)
+
+# Express as percents
+partic_df[,c("rate","ll","ul")]<-partic_df[,c("rate","ll","ul")]*100
+
+# Calculate Average Contribtutions
+
+contributors<-table(tsp$treatment,tsp$participate)[,2]
+
+contrib_rate<-mean(totalcont~treatment,data=tsp[tsp$participate==1,])
+contrib_sd<-sd(totalcont~treatment,data=tsp[tsp$participate==1,])
+
+contrib_df<-data.frame(contrib=contrib_rate,
+                       contrib_se=contrib_sd/sqrt(contributors)
+                       )
+contrib_df$contrib_ll<-with(contrib_df,contrib-1.96*contrib_se)
+contrib_df$contrib_ul<-with(contrib_df,contrib+1.96*contrib_se)
+
+plot_df<-cbind(partic_df,contrib_df)
+
+grid.newpage()
+plot_df$treatment<-factor(plot_df$treatment,levels=c("Control","No Suggestion",1:8))
+# two plots
+p1 <- ggplot(plot_df, aes(treatment, rate)) + geom_bar(stat="identity") + theme_bw()+ylim(0,5)+geom_errorbar(aes(ymin=ll,ymax=ul),width=.5)+xlab("Treatment")+ylab("Bars= % Participating\nPoints=Average Contribution")+theme(axis.text.x = element_text(angle = 45, hjust = 1))
+p2 <- ggplot(plot_df, aes(treatment, contrib)) + geom_point(colour = "red") +geom_errorbar(aes(ymin=contrib_ll,ymax=contrib_ul),width=.5)+ theme_bw() %+replace% 
+    theme(panel.grid.major = element_blank(), panel.grid.minor = element_blank(),panel.background = element_rect(fill = NA),axis.text.x = element_text(angle = 45, hjust = 1))+ylim(0,10)+xlab("Treatment")+ylab("Bars= % Participating\nPoints=Average Contribution")
+
+# extract gtable
+g1 <- ggplot_gtable(ggplot_build(p1))
+g2 <- ggplot_gtable(ggplot_build(p2))
+
+# overlap the panel of 2nd plot on that of 1st plot
+pp <- c(subset(g1$layout, name == "panel", se = t:r))
+g <- gtable_add_grob(g1, g2$grobs[[which(g2$layout$name == "panel")]], pp$t, 
+    pp$l, pp$b, pp$l)
+
+# axis tweaks
+ia <- which(g2$layout$name == "axis-l")
+ga <- g2$grobs[[ia]]
+ax <- ga$children[[2]]
+ax$widths <- rev(ax$widths)
+ax$grobs <- rev(ax$grobs)
+ax$grobs[[1]]$x <- ax$grobs[[1]]$x - unit(1, "npc") + unit(0.15, "cm")
+g <- gtable_add_cols(g, g2$widths[g2$layout[ia, ]$l], length(g$widths) - 1)
+g <- gtable_add_grob(g, ax, pp$t, length(g$widths) - 1, pp$b)
+
+# draw it
+grid.draw(g)
+
+
+
+```
+
+
+# Conclusion
+
+There were more than $1 million in new contributions made in February 2016 alone as a result of the emails, demonstrating behaviorally informed email campaigns continue to be effective at prompting Servicemember enrollment in TSP. While an increase in suggested contribution rates led to slightly lower new enrollments, the average contribution rate and size increased with higher suggested contributions, which resulted in no substantial net difference in actual savings between groups. As military, civilian, and private sector employees consider modifications to compensation and retirement schemes, the current policy default – 3 percent suggested contributions – may not be optimal in terms of encouraging new enrollments or substantial retirement contributions^[See: www.whitehouse.gov/the-press-office/2015/07/13/fact-sheet-white-house-conference-aging
+]
 
 
