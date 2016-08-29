@@ -3,8 +3,8 @@ title: "SBST Abstract: Anchoring & TSP Enrollment: *Suggesting contribution rate
 author: "Paul Testa and Jake Bowers"
 date: '`r format(Sys.Date(), "%B %d, %Y")`'
 output:
-html_document:
-toc: TRUE
+    html_document:
+      toc: TRUE
 ---
 
 
